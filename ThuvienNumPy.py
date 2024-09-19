@@ -124,4 +124,4 @@ canvas.get_tk_widget().pack(side=TOP, fill=BOTH, expand=True)
 # window.state('zoomed')
 # Bắt đầu vòng lặp sự kiện
 window.mainloop()
-print("Khánh")
+print("Khanhs")
