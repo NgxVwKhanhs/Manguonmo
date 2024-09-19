@@ -1,3 +1,3 @@
 import numpy
 
-print("Xin chào")hfghf
+print("Xin chào khánh")
