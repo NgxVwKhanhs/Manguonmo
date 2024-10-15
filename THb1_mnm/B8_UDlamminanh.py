@@ -1,69 +1,110 @@
 import tkinter as tk
 from tkinter import filedialog
 import cv2
-from PIL import ImageTk, Image
+import numpy as np
+from PIL import Image, ImageTk
 
 def open_image():
-    global image
-    # Mở hộp thoại chọn file ảnh
-    filepath = filedialog.askopenfilename(
+    """Mở hộp thoại chọn file và hiển thị ảnh được chọn."""
+    global img, file_path
+
+    file_path = filedialog.askopenfilename(
         initialdir="/",
         title="Chọn ảnh",
-        filetypes=(("JPEG", "*.jpg;*.jpeg"), ("PNG", "*.png"), ("All files", "*.*"))
+        filetypes=(("Image files", "*.jpg *.jpeg *.png *.bmp"), ("All files", "*.*")),
     )
-    if filepath:
-        # Đọc ảnh từ file
-        image = cv2.imread(filepath)
-        # Hiển thị ảnh gốc
-        show_image(image, canvas_original)
+    if file_path:
+        img = cv2.imread(file_path)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = resize_image(img)
+        show_original_image(img)
+        update_image()
 
-def apply_blur():
-    global image, blurred_image
-    if image is not None:
-        # Lấy giá trị kernel size từ thanh trượt
-        kernel_size = slider.get()
-        # Áp dụng Gaussian Blur
-        blurred_image = cv2.GaussianBlur(image, (kernel_size, kernel_size), 0)
-        # Hiển thị ảnh đã làm mịn
-        show_image(blurred_image, canvas_blurred)
+def update_image():
+    """Cập nhật ảnh sau khi lọc làm mịn."""
+    global img
+    if img is not None:
+        kernel_size = kernel_scale.get()
 
-def show_image(img, canvas):
-    # Chuyển đổi ảnh từ BGR sang RGB
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    # Chuyển đổi ảnh sang định dạng PhotoImage
-    photo = ImageTk.PhotoImage(image=Image.fromarray(img_rgb))
-    # Hiển thị ảnh trên canvas
-    canvas.create_image(0, 0, anchor=tk.NW, image=photo)
-    canvas.image = photo
+        # Đảm bảo kernel_size là số lẻ
+        if kernel_size % 2 == 0:
+            kernel_size += 1
 
-# Tạo cửa sổ giao diện
+        # Áp dụng lọc trung bình
+        blurred_img = cv2.blur(img, (kernel_size, kernel_size))
+        show_processed_image(blurred_img)
+
+def show_original_image(img):
+    """Hiển thị ảnh gốc trên label bên trái."""
+    img_tk = ImageTk.PhotoImage(image=Image.fromarray(img))
+    original_image_label.config(image=img_tk)
+    original_image_label.image = img_tk
+
+def show_processed_image(img):
+    """Hiển thị ảnh đã xử lý trên label bên phải."""
+    img_tk = ImageTk.PhotoImage(image=Image.fromarray(img))
+    processed_image_label.config(image=img_tk)
+    processed_image_label.image = img_tk
+
+def resize_image(img, max_width=400, max_height=400):
+    """Thay đổi kích thước ảnh nếu cần để vừa với màn hình."""
+    height, width = img.shape[:2]
+    if width > max_width or height > max_height:
+        scale_factor = min(max_width / width, max_height / height)
+        new_width = int(width * scale_factor)
+        new_height = int(height * scale_factor)
+        img = cv2.resize(img, (new_width, new_height))
+    return img
+
+def save_image():
+    """Lưu ảnh đã xử lý."""
+    global img, file_path
+    if img is not None:
+        save_path = filedialog.asksaveasfilename(
+            defaultextension=".jpg",
+            filetypes=(("JPEG", "*.jpg;*.jpeg"), ("PNG", "*.png"), ("All files", "*.*")),
+        )
+        if save_path:
+            cv2.imwrite(save_path, cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+
+# Tạo cửa sổ chính
 root = tk.Tk()
-root.title("Ứng dụng Làm Mịn Ảnh")
+root.title("Ứng dụng lọc làm mịn ảnh")
+
+# Biến toàn cục lưu trữ ảnh
+img = None
+file_path = None
+
+# Tạo frame chứa 2 ảnh
+image_frame = tk.Frame(root)
+image_frame.pack()
+
+# Tạo label để hiển thị ảnh gốc
+original_image_label = tk.Label(image_frame)
+original_image_label.pack(side="left", padx=10)
+
+# Tạo label để hiển thị ảnh đã xử lý
+processed_image_label = tk.Label(image_frame)
+processed_image_label.pack(side="left", padx=10)
 
 # Tạo nút chọn ảnh
-button_open = tk.Button(root, text="Chọn ảnh", command=open_image)
-button_open.pack()
+open_button = tk.Button(root, text="Chọn ảnh", command=open_image)
+open_button.pack(pady=10)
 
-# Tạo canvas hiển thị ảnh gốc
-canvas_original = tk.Canvas(root, width=400, height=300)
-canvas_original.pack(side=tk.LEFT)
+# Tạo thanh trượt cho kích thước kernel
+kernel_scale = tk.Scale(
+    root,
+    from_=1,
+    to=15,
+    orient="horizontal",
+    label="Kích thước kernel (lẻ):",
+    command=lambda x: update_image(),
+)
+kernel_scale.set(3)  # Giá trị mặc định
+kernel_scale.pack()
 
-# Tạo canvas hiển thị ảnh đã làm mịn
-canvas_blurred = tk.Canvas(root, width=400, height=300)
-canvas_blurred.pack(side=tk.RIGHT)
+# Tạo nút lưu ảnh
+save_button = tk.Button(root, text="Lưu ảnh", command=save_image)
+save_button.pack(pady=10)
 
-# Tạo thanh trượt điều chỉnh kernel size
-slider = tk.Scale(root, from_=1, to=51, orient=tk.HORIZONTAL, label="Kernel Size", length=400)
-slider.set(1) # Đặt giá trị ban đầu cho kernel size
-slider.pack()
-
-# Tạo nút áp dụng làm mịn
-button_blur = tk.Button(root, text="Làm mịn", command=apply_blur)
-button_blur.pack()
-
-# Biến lưu trữ ảnh
-image = None
-blurred_image = None
-
-# Chạy ứng dụng
 root.mainloop()
